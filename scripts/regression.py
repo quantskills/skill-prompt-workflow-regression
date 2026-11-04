@@ -18,6 +18,7 @@ def canonical_hash(value: object) -> str:
 
 
 def freeze(suite: dict, path: Path) -> dict:
+    minimum_repeats(suite)
     if str(suite.get("status", "")).startswith("draft") or "SELECT_ACTUAL" in str(suite.get("model", "")):
         raise ValueError("草案的实际模型配置未确认，不能冻结")
     if not suite.get("model") or not isinstance(suite.get("model_parameters"), dict):
@@ -35,8 +36,12 @@ def freeze(suite: dict, path: Path) -> dict:
     for task in tasks:
         if not task.get("rules") or "input" not in task:
             raise ValueError("每个任务必须有输入和冻结量规")
-    if suite.get("evaluator") != "deterministic-json-rules-v1":
+    if suite.get("evaluator") not in ("deterministic-json-rules-v1", "deterministic-json-rules-v2"):
         raise ValueError("未支持的量规版本")
+    for task in tasks:
+        validate_rules(task["rules"])
+        if suite["evaluator"].endswith("v1") and any("exact_json" in rule for rule in task["rules"]):
+            raise ValueError("exact_json 需要新建 v2 研究，不可修改历史量规")
     manifest = {"suite_hash": canonical_hash(suite), "model": suite["model"],
                 "model_parameters": suite["model_parameters"], "evaluator": suite["evaluator"],
                 "task_hashes": {t["id"]: canonical_hash(t) for t in tasks}}
@@ -50,7 +55,40 @@ def freeze(suite: dict, path: Path) -> dict:
     return manifest
 
 
+def minimum_repeats(suite: dict) -> int:
+    minimum = suite.get("min_repeats", 3)
+    if isinstance(minimum, bool) or not isinstance(minimum, int) or minimum < 3:
+        raise ValueError("稳定性研究重复次数必须是至少3的整数")
+    return minimum
+
+
+def validate_rules(rules: list[dict]) -> None:
+    checks = {"equals", "exact_json", "type", "contains"}
+    if not isinstance(rules, list) or not rules:
+        raise ValueError("量规不能为空")
+    for rule in rules:
+        if not isinstance(rule, dict) or set(rule) - (checks | {"path"}) or not set(rule) & checks:
+            raise ValueError("未知或无效量规，拒绝静默跳过")
+        if not isinstance(rule.get("path", []), list) or any(
+            isinstance(key, bool) or not isinstance(key, (str, int)) or isinstance(key, int) and key < 0
+            for key in rule.get("path", [])
+        ):
+            raise ValueError("量规路径只能包含字段名和非负整数下标")
+
+
+def exact_json_equal(actual: object, expected: object) -> bool:
+    # Keep booleans distinct from numbers, including inside nested tool arguments.
+    if isinstance(actual, bool) or isinstance(expected, bool):
+        return type(actual) is type(expected) and actual == expected
+    if isinstance(actual, dict) and isinstance(expected, dict):
+        return actual.keys() == expected.keys() and all(exact_json_equal(actual[k], expected[k]) for k in actual)
+    if isinstance(actual, list) and isinstance(expected, list):
+        return len(actual) == len(expected) and all(exact_json_equal(a, b) for a, b in zip(actual, expected))
+    return actual == expected
+
+
 def evaluate(response: str, rules: list[dict]) -> tuple[bool, list[str]]:
+    validate_rules(rules)
     try:
         obj = json.loads(response, object_pairs_hook=_unique_object, parse_constant=_invalid_number)
         json.dumps(obj, allow_nan=False)
@@ -67,6 +105,8 @@ def evaluate(response: str, rules: list[dict]) -> tuple[bool, list[str]]:
             reasons.append("missing_path:"+str(rule.get("path"))); continue
         if "equals" in rule and value != rule["equals"]:
             reasons.append("wrong_value:"+str(rule.get("path")))
+        if "exact_json" in rule and not exact_json_equal(value, rule["exact_json"]):
+            reasons.append("wrong_exact_json:"+str(rule.get("path")))
         if "type" in rule:
             if rule["type"] not in types:
                 raise ValueError("未知量规类型")
@@ -81,6 +121,7 @@ def evaluate(response: str, rules: list[dict]) -> tuple[bool, list[str]]:
 
 
 def analyze(suite: dict, manifest: dict, versions: dict, runs: list[dict], split: str) -> tuple[dict, pd.DataFrame]:
+    minimum = minimum_repeats(suite)
     if manifest["suite_hash"] != canonical_hash(suite):
         raise ValueError("任务集与冻结清单不符")
     baseline, candidate = versions["baseline"], versions["candidate"]
@@ -111,6 +152,9 @@ def analyze(suite: dict, manifest: dict, versions: dict, runs: list[dict], split
             raise ValueError("缺少 EVO 运行标识；本地样例必须明确使用 fixture 标识")
         if run.get("status") not in ("completed", "failed"):
             raise ValueError("运行尚未结束，不能计入完成记录")
+        repeat = run["repeat"]
+        if isinstance(repeat, bool) or not isinstance(repeat, int) or not 0 <= repeat < minimum:
+            raise ValueError("重复编号必须是冻结范围内的非负整数")
         tokens = run["tokens"]
         if isinstance(tokens, bool) or not isinstance(tokens, int) or tokens < 0:
             raise ValueError("token 数量必须为非负整数，不接受隐式取整")
@@ -118,6 +162,8 @@ def analyze(suite: dict, manifest: dict, versions: dict, runs: list[dict], split
         if not np.isfinite([cost, latency]).all() or min(cost, tokens, latency) < 0:
             raise ValueError("费用、token 或延迟不合法")
         ok, reasons = evaluate(run.get("response", ""), tasks[run["task_id"]]["rules"])
+        if run["status"] == "failed":
+            reasons.append("execution_failed")
         ok = ok and run["status"] == "completed"
         records.append({"task_id": run["task_id"], "version": run["version"], "repeat": run["repeat"],
                         "passed": ok, "reasons": json.dumps(reasons), "cost": cost, "tokens": tokens,
@@ -134,9 +180,6 @@ def analyze(suite: dict, manifest: dict, versions: dict, runs: list[dict], split
         if call_id in calls and calls[call_id] != owner:
             raise ValueError("同一平台调用被复用为独立重复或不同版本")
         calls[call_id] = owner
-    minimum = int(suite.get("min_repeats", 3))
-    if minimum < 3:
-        raise ValueError("稳定性研究至少重复三次")
     repeats = set(range(minimum))
     for task_id in tasks:
         for version in (baseline, candidate):

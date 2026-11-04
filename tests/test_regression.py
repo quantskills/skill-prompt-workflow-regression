@@ -81,6 +81,14 @@ def test_boolean_is_not_number_and_invalid_json_fails():
     assert not evaluate('not-json',[{"type":"object"}])[0]
 
 
+@pytest.mark.parametrize("invalid_tokens", [1.5, -0.5, True])
+def test_token_counts_cannot_be_silently_coerced(tmp_path, invalid_tokens):
+    suite, manifest, versions, runs = fixture(tmp_path)
+    runs[-1]["tokens"] = invalid_tokens
+    with pytest.raises(ValueError, match="token"):
+        analyze(suite, manifest, versions, runs, "holdout")
+
+
 @pytest.mark.parametrize("response", ['{"x":0,"x":1}', '{"x":NaN}', '{"x":Infinity}'])
 def test_direct_run_export_cannot_bypass_strict_json(response):
     assert not evaluate(response, [{"type":"object"}])[0]

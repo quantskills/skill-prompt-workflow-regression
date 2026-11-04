@@ -111,7 +111,10 @@ def analyze(suite: dict, manifest: dict, versions: dict, runs: list[dict], split
             raise ValueError("缺少 EVO 运行标识；本地样例必须明确使用 fixture 标识")
         if run.get("status") not in ("completed", "failed"):
             raise ValueError("运行尚未结束，不能计入完成记录")
-        cost = float(run["cost"]); tokens = int(run["tokens"]); latency = float(run["latency_seconds"])
+        tokens = run["tokens"]
+        if isinstance(tokens, bool) or not isinstance(tokens, int) or tokens < 0:
+            raise ValueError("token 数量必须为非负整数，不接受隐式取整")
+        cost = float(run["cost"]); latency = float(run["latency_seconds"])
         if not np.isfinite([cost, latency]).all() or min(cost, tokens, latency) < 0:
             raise ValueError("费用、token 或延迟不合法")
         ok, reasons = evaluate(run.get("response", ""), tasks[run["task_id"]]["rules"])

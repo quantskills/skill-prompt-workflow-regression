@@ -1,0 +1,23 @@
+{
+  "status": "draft_model_configuration_pending_platform_inspection",
+  "model": "SELECT_ACTUAL_EVO_MODEL_VERSION_BEFORE_FREEZE",
+  "model_parameters": {"temperature": 0},
+  "evaluator": "deterministic-json-rules-v1",
+  "min_repeats": 3,
+  "max_pass_rate_drop": 0,
+  "max_cost_ratio": 1.2,
+  "tasks": [
+    {"id":"dev-size-01","split":"development","input":{"task":"position_size","equity":1000000,"risk_fraction":0.01,"stop_distance":20,"contract_multiplier":10,"request":"按风险预算除以每手止损金额向下取整，返回JSON字段quantity。"},"rules":[{"path":["quantity"],"type":"number","equals":50}]},
+    {"id":"dev-size-02","split":"development","input":{"task":"position_size","equity":100000,"risk_fraction":0.005,"stop_distance":30,"contract_multiplier":10,"request":"按风险预算除以每手止损金额向下取整，返回JSON字段quantity。"},"rules":[{"path":["quantity"],"type":"number","equals":1}]},
+    {"id":"dev-time-01","split":"development","input":{"task":"information_available","available_at":"2024-05-06T08:59:00+08:00","decision_at":"2024-05-06T09:00:00+08:00","request":"仅当信息可用时刻不晚于决策时刻时可用，返回JSON布尔字段usable。"},"rules":[{"path":["usable"],"type":"boolean","equals":true}]},
+    {"id":"dev-time-02","split":"development","input":{"task":"information_available","available_at":"2024-05-06T01:05:00Z","decision_at":"2024-05-06T09:00:00+08:00","request":"先对齐时区，再判断信息可用时刻是否不晚于决策时刻，返回JSON布尔字段usable。"},"rules":[{"path":["usable"],"type":"boolean","equals":false}]},
+    {"id":"dev-data-01","split":"development","input":{"task":"validate_returns","returns":[0.01,null,-0.02],"request":"缺失收益不得填零。返回JSON字段status，存在缺失时填missing_data，否则填ok。"},"rules":[{"path":["status"],"type":"string","equals":"missing_data"}]},
+    {"id":"dev-cost-01","split":"development","input":{"task":"round_trip_cost","position":0.5,"single_side_fee_rate":0.0002,"single_side_slippage_rate":0.0003,"request":"逐窗口开平仓，成本等于2乘绝对仓位乘两项单边费率之和。返回JSON字段cost_return。"},"rules":[{"path":["cost_return"],"type":"number","equals":0.0005}]},
+    {"id":"hold-size-01","split":"holdout","input":{"task":"position_size","equity":250000,"risk_fraction":0.008,"stop_distance":17,"contract_multiplier":10,"request":"按风险预算除以每手止损金额向下取整，返回JSON字段quantity。"},"rules":[{"path":["quantity"],"type":"number","equals":11}]},
+    {"id":"hold-size-02","split":"holdout","input":{"task":"position_size","equity":100000,"risk_fraction":0.001,"stop_distance":100,"contract_multiplier":10,"request":"按风险预算除以每手止损金额向下取整，返回JSON字段quantity，风险预算不足一手时数量为零。"},"rules":[{"path":["quantity"],"type":"number","equals":0}]},
+    {"id":"hold-time-01","split":"holdout","input":{"task":"information_available","available_at":"2024-11-04T16:00:00-05:00","decision_at":"2024-11-05T04:59:00+08:00","request":"先对齐时区，再判断信息可用时刻是否不晚于决策时刻，返回JSON布尔字段usable。"},"rules":[{"path":["usable"],"type":"boolean","equals":false}]},
+    {"id":"hold-time-02","split":"holdout","input":{"task":"information_available","available_at":"2024-07-01T16:00:00-04:00","decision_at":"2024-07-02T04:00:00+08:00","request":"先对齐时区，再判断信息可用时刻是否不晚于决策时刻，返回JSON布尔字段usable。"},"rules":[{"path":["usable"],"type":"boolean","equals":true}]},
+    {"id":"hold-data-01","split":"holdout","input":{"task":"validate_parameter_grid","expected_parameters":["p10","p20","p40"],"observed_parameters":["p10","p40"],"request":"参数网格必须齐全才可比较。返回JSON布尔字段comparable和缺少参数数组missing。"},"rules":[{"path":["comparable"],"type":"boolean","equals":false},{"path":["missing"],"type":"array","contains":"p20"}]},
+    {"id":"hold-cost-01","split":"holdout","input":{"task":"round_trip_cost","position":-0.25,"single_side_fee_rate":0.0004,"single_side_slippage_rate":0.0002,"request":"逐窗口开平仓，成本等于2乘绝对仓位乘两项单边费率之和。返回JSON字段cost_return。"},"rules":[{"path":["cost_return"],"type":"number","equals":0.0003}]}
+  ]
+}

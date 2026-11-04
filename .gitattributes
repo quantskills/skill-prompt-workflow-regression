@@ -1,0 +1,2 @@
+# Preserve prompt and source bytes across Windows and Linux checkouts.
+* -text

@@ -23,6 +23,10 @@ class SafeParser(argparse.ArgumentParser):
 def check():
     ready = sys.version_info >= (3, 11)
     print("Python " + ".".join(map(str, sys.version_info[:3])) + ("：可用" if ready else "：需要 3.11 或以上"))
+    local = {}
+    installed = {}
+    evo = {"numpy": "1.26.4", "pandas": "2.3.3", "scipy": "1.17.1",
+           "pytest": "9.1.1", "PyYAML": "6.0.3"}
     for line in (ROOT/"requirements.txt").read_text(encoding="utf-8").splitlines():
         if "==" not in line or line.lstrip().startswith("#"):
             continue
@@ -31,10 +35,13 @@ def check():
             actual = metadata.version(name)
         except metadata.PackageNotFoundError:
             actual = None
-        # Match the documented clean environment; no automatic changes.
-        match = actual == required
-        ready = ready and match
-        print("依赖 " + name + "：" + (actual or "未安装") + "；已验证版本 " + required + (" ✓" if match else "（需准备或单独验证）"))
+        local[name] = required
+        installed[name] = actual
+        print("依赖 " + name + "：" + (actual or "未安装"))
+    # Accept complete profiles, never arbitrary mixtures of package versions.
+    profile = "本地固定环境" if installed == local else "EVO 平台环境" if installed == {name: evo.get(name) for name in local} else None
+    ready = ready and profile is not None and bool(local)
+    print("环境组合：" + (profile or "未匹配；请准备固定环境或单独验证，不能混用版本。"))
     print("检查不安装软件、不联网、不登录。准备方法见 references/getting-started.md。")
     return 0 if ready else 1
 

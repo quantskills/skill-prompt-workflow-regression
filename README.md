@@ -1,6 +1,6 @@
 # 提示词与工作流稳定性回归测试
 
-最近一次检查见[2026-11-05验收记录](references/validation-20261105.md)。本轮补了中文引导和结果页；新的EVO文件任务验证尚未完成，不把旧实验算作新结果。
+最近一次检查见[2026-11-05验收记录](references/validation-20261105.md)。本轮补了中文引导和结果页，并完成了 [Kimi 文件任务实测](references/kimi-file-workflow-20261105.md)。三轮计算结果正确，但都违反了指定读取方式的要求，完整工作流没有通过。实际使用时需要同时核对答案和工具调用记录。
 
 首次使用先看[三步入门](references/getting-started.md)：运行 `python start.py --check` 检查环境，`python start.py` 打开中文菜单。准备好依赖后，运行 `python start.py --demo --output outputs/first-demo`，打开结果目录里的 `使用结果.md`。每次使用新目录；示例是合成数据，不证明真实效果。
 

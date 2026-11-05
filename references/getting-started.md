@@ -18,7 +18,9 @@ python -m venv .venv
 .venv\Scripts\python start.py --check
 ```
 
-macOS / Linux 将下文的 `.venv\Scripts\python` 换成 `.venv/bin/python`。不要替换平台全局依赖；本入口按仓库固定版本检查，平台历史版本的验证结论仍单独保留。
+macOS / Linux 将下文的 `.venv\Scripts\python` 换成 `.venv/bin/python`。不要替换平台全局依赖。
+
+入口识别两套完整环境。独立安装采用 requirements.txt 的固定版本；EVO 环境采用 NumPy 1.26.4、pandas 2.3.3、pytest 9.1.1、PyYAML 6.0.3，CTA 还需要 SciPy 1.17.1。不同组合不能混用，缺少依赖或出现其他版本仍会停止。检查本身只核对版本，实际运行证据见[验收记录](validation-20261105.md)。在已经匹配的 EVO 环境中直接使用 `python`，不需要建立新环境或重新安装。
 
 ## 2. 跑合成示例
 

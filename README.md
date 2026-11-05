@@ -1,6 +1,8 @@
 # 提示词与工作流稳定性回归测试
 
-本轮补了中文引导和结果页，修复平台环境检查后，已在 EVO 通过 70 项软件测试及中文演示，见[平台复验记录](references/evo-recovery-20261105.md)。另完成了 [Kimi 文件任务实测](references/kimi-file-workflow-20261105.md)。三轮计算结果正确，但都违反了指定读取方式的要求，完整工作流没有通过。实际使用时需要同时核对答案和工具调用记录。
+这套工具用来比较提示词修改前后的实际表现。先固定任务和检查标准，再核对重复运行的答案、工具参数、失败处理和成本。它不会替模型执行真实任务，也不会凭模型一句“已完成”判定通过。
+
+已在 EVO 通过 70 项软件测试及中文演示，见[平台复验记录](references/evo-recovery-20261105.md)。此前的 [Kimi 文件任务实测](references/kimi-file-workflow-20261105.md)暴露了越界读取问题。补上[文件任务执行约定](references/execution-contract.md)后，用三组新会话复验，三组结果都算对，未观察到越界读取或猜填运行状态；第二组回执缺少来源标注，完整要求只满足了两组。第二、三组都经历了平台中断和原会话续跑，不能称为三次一次性成功。详细过程和原包摘要见[读取边界与回执复验](references/kimi-boundary-20261105.md)。
 
 首次使用先看[三步入门](references/getting-started.md)：运行 `python start.py --check` 检查环境，`python start.py` 打开中文菜单。准备好依赖后，运行 `python start.py --demo --output outputs/first-demo`，打开结果目录里的 `使用结果.md`。每次使用新目录；示例是合成数据，不证明真实效果。
 

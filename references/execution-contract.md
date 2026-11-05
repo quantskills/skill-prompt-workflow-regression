@@ -12,7 +12,7 @@
 4. 不修改输入、工具实现或其审计记录。输出工具记录时保留实际顺序和原始字段。输出正确但发生过越界读取，仍算失败。
 5. 计算结果与平台运行回执分开。计算程序不能预先写入“本次运行成功”、运行编号或数字退出码。程序结束后，查询平台实际运行记录，再单独生成回执。
 6. 回执中 run_id、status、exit_code 各自独立。只复制直接返回的值；平台显示 succeeded 不代表直接提供了 exit_code=0。没有直接返回的字段写 JSON null，并说明未提供。禁止根据无报错、文件存在、回答完成或常见惯例补值。
-7. 回执附 evidence 字段，标明证据来自哪个实际工具响应；不得把模型自己写的文件伪装成平台原始日志。若保存了日志，只保存原文，不把摘要说成原文。
+7. 回执附 evidence 字段，每个字段分别填写 response_id、tool、field、present。response_id 是实际响应的可定位标识；平台没有独立响应编号时，用工具名与被查询的运行编号组合，并明确它是定位标签。tool 填实际工具名称，field 填响应中的对应字段名，present 只能根据该字段是否出现填写 true 或 false。不得只重复字段值来代替来源，不得把模型自己写的文件伪装成平台原始日志。若保存了日志，只保存原文，不把摘要说成原文。
 8. 不自报评分，不声明已通过全部验收。交付实际执行的程序、计算结果、回执和工具记录，交由外部核对。
 
 回执最小结构如下。示例中的 null 不是可随意替换的占位符，只有直接证据出现时才填值。
@@ -23,16 +23,26 @@
   "status": null,
   "exit_code": null,
   "evidence": {
-    "run_id": null,
-    "status": null,
-    "exit_code": null
+    "run_id": {"response_id": "script_status/<实际运行编号>", "tool": "script_status", "field": "run_id", "present": true},
+    "status": {"response_id": "script_status/<实际运行编号>", "tool": "script_status", "field": "status", "present": true},
+    "exit_code": {"response_id": "script_status/<实际运行编号>", "tool": "script_status", "field": "exit_code", "present": false}
   }
 }
 ```
 
+上述结构仅演示一次状态查询返回运行编号和状态、未返回退出码的情况。实际工具名、编号和字段存在情况必须逐项核对。没有查询到任何平台响应时，停止生成成功回执，报告证据缺失。
+
 ## 验收者检查
 
 对照真实平台调用轨迹检查所有数据读取，包括计算之前的预览和排错操作。只看程序里的工具日志无法排除先前越界。对照运行工具响应逐字段核对回执，明确区分外层平台任务与内部子进程；子进程的退出码不能填到外层任务上。
+
+可用 `scripts/receipt.py` 做逐字段一致性检查。验收者独立保存观察记录，不让执行模型自行提供整套验收证据。观察文件以 response_id 为键，每条包含 tool、run_id 和 response。response 只摘录平台直接返回的字段，不补齐缺失值。保存原始平台记录以供追查。
+
+```bash
+python scripts/receipt.py --receipt run_receipt.json --observations observations.json --run-id ACTUAL_RUN_ID
+```
+
+检查通过仅表示回执与提供的记录一致。它无法证明观察记录真实，也无法代替完整读取轨迹检查。
 
 这份约定是行为约束，不是访问隔离。若环境仍允许普通工具读取数据，必须披露这一限制；涉及敏感数据时需由系统实施真正的最小权限，不能仅靠提示词保证安全。不要未经用户授权改平台权限。
 

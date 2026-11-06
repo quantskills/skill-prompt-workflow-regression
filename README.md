@@ -2,19 +2,37 @@
 
 这套工具用来比较提示词修改前后的实际表现。先固定任务和检查标准，再核对重复运行的答案、工具参数、失败处理和成本。它不会替模型执行真实任务，也不会凭模型一句“已完成”判定通过。
 
-最新三轮 Kimi-K3 实际任务已执行并取回原包。三轮计算结果正确，但第三轮中断恢复后读取了第二轮脚本，违反本轮文件白名单，完整行为验收失败。回执编号和状态与平台显示一致，未知退出码都留空；完整原始响应尚未独立导出，不能宣称来源字段全部核验通过。过程见[新版三轮复验](references/kimi-provenance-20261105.md)。当前仍按研究工具使用，不保证模型遵守访问边界，不建议用提示词约定独自保护敏感文件。
+**v7 是本地交付版。** 下面三组是用冻结的合成数据在本机实际跑出来的结果。v7 没有在 EVO 上执行这三组任务，也没有调用 DS-V4-Pro 或取得平台原始回执。以前的 EVO 实验仅供查阅，不能算作 v7 的平台验收。
 
-新增[回执核对工具](references/receipt-validation.md)，用于逐字段比较独立保存的运行证据。软件测试通过只说明检查器按规则工作，不能抵消模型实际执行中的失败。
+## v7 三组本地实跑
 
-已在 EVO 通过 70 项软件测试及中文演示，见[平台复验记录](references/evo-recovery-20261105.md)。此前的 [Kimi 文件任务实测](references/kimi-file-workflow-20261105.md)暴露了越界读取问题。补上[文件任务执行约定](references/execution-contract.md)后，用三组新会话复验，三组结果都算对，未观察到越界读取或猜填运行状态；第二组回执缺少来源标注，完整要求只满足了两组。第二、三组都经历了平台中断和原会话续跑，不能称为三次一次性成功。详细过程和原包摘要见[读取边界与回执复验](references/kimi-boundary-20261105.md)。
+| 任务 | 人民币折算合计 | 重复业务编号 | 缺失数量的业务编号 |
+| --- | --- | --- | --- |
+| `fixed-v7-1` | 20.454 元 | `0007` | `0040` |
+| `fixed-v7-2` | 49.25 元 | `0030` | `0002` |
+| `fixed-v7-3` | 35.11125 元 | `0101` | `0105` |
 
-首次使用先看[三步入门](references/getting-started.md)：运行 `python start.py --check` 检查环境，`python start.py` 打开中文菜单。准备好依赖后，运行 `python start.py --demo --output outputs/first-demo`，打开结果目录里的 `使用结果.md`。每次使用新目录；示例是合成数据，不证明真实效果。
+三组金额都和独立预期一致，业务编号的前导零也保留了。每组读表记录都有五次调用，其中包括库存读取预设超时后的一次重试，以及受限表的一次拒绝。拒绝由合成测试模拟，不证明平台有文件隔离。本地完整测试 141 项通过。
 
-自己的数据统一放进一个文件夹，再运行 `python start.py --run --input-dir "我的输入" --output "outputs/我的结果"`。所需文件与准备步骤见入门说明。以下保留原始命令和历史研究记录，供进一步使用；[正式评分与模型审查](references/assessment.md)均为可选，不阻止普通使用。
+## 复现这三组
 
-提示词改过一轮之后，旧任务是否仍然通过，结果是否更不稳定，成本是否上涨，可以用冻结任务集逐版比较。这套工具读取 EVO 的重复运行记录，核对模型和输入版本，再给出通过率、波动、成本和回滚建议。
+用 Python 3.11 或更新版本即可，不需要安装额外依赖、登录平台或联网。把 [v7 本地复现材料](assets/v7-local-replay.zip) 解压到新目录，然后在该目录运行下面的 PowerShell 命令。重新跑时请换一个新目录，避免覆盖已有结果。
 
-已完成一轮 EVO 实测。原版、改写版与修订版分别在开发集上重复运行，修订版再经过保留集检验。故意破坏格式的版本被拦下后，已在独立 EVO 研究项目中恢复正常版本并复测。输入校验与独立重复检查也已完成 EVO 平台复验；这不等于负责人正式验收，也不是所有模型和任务的可靠性保证。
+```powershell
+python -X utf8 qs_prepare_v7.py
+if ($LASTEXITCODE) { throw '准备失败' }
+foreach ($i in 1..3) {
+    python -X utf8 "fixed-v7-$i/solve.py"
+    if ($LASTEXITCODE) { throw "第 $i 组执行失败" }
+}
+python -X utf8 qs_collect_v7.py
+if ($LASTEXITCODE) { throw '收集结果失败' }
+python -X utf8 verify_results.py --download fixed-v7-results.zip
+```
+
+最后应看到三行 `verified`。每组的详细结果在各自的 `output/result.json`，汇总包是刚生成的 `fixed-v7-results.zip`。复现材料另附此前本机生成的 `v7-local-observed-results.zip`，可和新结果对照。两个包都是本地结果，没有平台回执。
+
+要跑完整演示或评价自己的数据，先看[三步入门](references/getting-started.md)。金额和读表规则见[固定文件流程](references/fixed-file-workflow.md)。[正式评分与模型审查](references/assessment.md)是可选步骤。
 
 ## 先跑一个例子
 
@@ -50,7 +68,9 @@ macOS / Linux 将 `.venv\Scripts\python` 换成 `.venv/bin/python`。演示生�
 
 `assets/task-suite.draft.json` 提供 12 项量化工作流任务，开发集和保留集各 6 项。先确认 EVO 的实际模型版本与参数，再复制为正式任务集并冻结。`prompt-v1.txt` 为基线，`prompt-v2.txt` 为开发候选，`prompt-negative-control.txt` 是预先定义的输出格式破坏样例。正式实验前需冻结三个版本的散列，保留集不用于反复调优。
 
-## 实际验证结果
+## 历史 EVO 验证记录
+
+本节记录的是旧版本的实验。两轮较近的工具行为记录见 [DS-V4-Pro 固定流程](references/evo-fixed-workflow-20261105.md)和 [Kimi-K3 文件读取边界](references/kimi-provenance-20261105.md)，其中保留了计算修正、工具调用错误和原始回执缺口。
 
 2026 年 11 月在 EVO 完成一轮多版本实验。保留集含 6 项任务，每版进行三次独立批量调用，共得到 18 个任务评分。任务评分数不等于独立模型调用数。
 
@@ -67,7 +87,7 @@ macOS / Linux 将 `.venv\Scripts\python` 换成 `.venv/bin/python`。演示生�
 
 后续检查补上了 token 数量校验，并新增语义错误、工具参数和失败恢复检查。Kimi 审查后又补严了重复编号及次数校验，防止布尔值、小数被当成整数。最终56项测试在本地、解压目录和EVO均通过，两个环境的离线示例也正常完成。新增 v2 规则可核对完整答案和嵌套参数，区分布尔值与数值，拦截缺失或多余字段；失败的运行明确记录原因，不能因答案内容正确就放行。写法见[语义与恢复检查](references/semantic-workflow-tests.md)。原保留集核心结果重算不变。
 
-新增故障用例是人工构造的检查器测试，不是模型在真实工具链上的成功率。历史 v1 规则和已看过的保留集没有改写。最新版 EVO 复验记录见[本轮验证](references/revalidation-r3.md)，不要把此前 25 项平台测试当成最新版的全量结果。
+新增故障用例是人工构造的检查器测试，不能用于推断模型在真实工具链上的成功率。历史 v1 规则和已看过的保留集没有改写。旧版的软件复验详见[历史复验记录](references/revalidation-r3.md)。
 
 `assets/prompt-v3.txt` 保留了修订版提示词的原文，可作为中文 JSON 工作流的起点。换模型、任务或工具后仍要重新冻结并检验，不沿用本轮通过率。
 

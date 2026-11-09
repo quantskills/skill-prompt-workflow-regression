@@ -1,0 +1,60 @@
+{
+  "model": "offline-tutorial-fixture",
+  "model_parameters": {
+    "temperature": 0
+  },
+  "evaluator": "deterministic-json-rules-v2",
+  "min_repeats": 3,
+  "max_pass_rate_drop": 0,
+  "max_cost_ratio": 1.2,
+  "tasks": [
+    {
+      "id": "dev-format",
+      "split": "development",
+      "input": {
+        "text": "订单编号 0003"
+      },
+      "rules": [
+        {
+          "path": [
+            "order_id"
+          ],
+          "type": "string",
+          "exact_json": "0003"
+        }
+      ]
+    },
+    {
+      "id": "invoice-month",
+      "split": "holdout",
+      "input": {
+        "text": "开票日期 2026-01-17"
+      },
+      "rules": [
+        {
+          "path": [
+            "invoice_month"
+          ],
+          "type": "string",
+          "exact_json": "2026-01"
+        }
+      ]
+    },
+    {
+      "id": "order-id",
+      "split": "holdout",
+      "input": {
+        "text": "订单编号 0041"
+      },
+      "rules": [
+        {
+          "path": [
+            "order_id"
+          ],
+          "type": "string",
+          "exact_json": "0041"
+        }
+      ]
+    }
+  ]
+}

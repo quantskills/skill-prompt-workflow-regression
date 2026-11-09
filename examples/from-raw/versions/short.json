@@ -1,0 +1,7 @@
+{
+  "prompt": "遇到订单编号，输出 order_id。遇到开票日期，输出 invoice_month，格式为 YYYY-MM。只输出 JSON。",
+  "workflow": {
+    "calls": [],
+    "output": "final_text"
+  }
+}
